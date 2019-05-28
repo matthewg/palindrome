@@ -1,0 +1,40 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use FindBin qw($Bin);
+use lib $Bin;
+use PandromeTrie;
+
+my $trie = PandromeTrie->new;
+$trie->add(qw(bar bard bards));
+
+die "FAIL 0\n" if $trie->lookup("ba") ne "bar";
+die "FAIL 1\n" if $trie->lookup("bar") ne "bar";
+die "FAIL 2\n" if $trie->lookup("bard") ne "bard";
+die "FAIL 3\n" if $trie->lookup("bards") ne "bards";
+die "FAIL 4\n" if $trie->lookup("bardsx") ne "bards";
+
+my @words = $trie->lookup("bardsx");
+die "FAIL 5\n" if
+	@words != 3 or
+	$words[0] ne "bards" or
+	$words[1] ne "bard" or
+	$words[2] ne "bar";
+@words = $trie->lookup("bards");
+die "FAIL 6: @words\n" if
+	@words != 3 or
+	$words[0] ne "bards" or
+	$words[1] ne "bard" or
+	$words[2] ne "bar";
+@words = $trie->lookup("bard");
+die "FAIL 7: @words\n" if
+	@words != 3 or
+	$words[0] ne "bard" or
+	$words[1] ne "bards" or
+	$words[2] ne "bar";
+@words = $trie->lookup("foo");
+die "FAIL 8: @words\n" if @words;
+die "FAIL 9\n" if scalar($trie->lookup("foo"));
+print "OK\n";
+exit 0;

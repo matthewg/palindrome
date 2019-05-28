@@ -1,0 +1,228 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>pandrome -- Generate palindromic pangrams</title>
+<link rev="made" href="mailto:root@b34.apple.com" />
+</head>
+
+<body style="background-color: white">
+
+<p><a name="__index__"></a></p>
+<!-- INDEX BEGIN -->
+
+<ul>
+
+	<li><a href="#name">NAME</a></li>
+	<li><a href="#usage">USAGE</a></li>
+	<li><a href="#description">DESCRIPTION</a></li>
+	<li><a href="#files">FILES</a></li>
+	<li><a href="#algorithm">ALGORITHM</a></li>
+	<ul>
+
+		<li><a href="#data_structures">DATA STRUCTURES</a></li>
+		<li><a href="#word_selection">WORD SELECTION</a></li>
+		<li><a href="#q_optimization">Q OPTIMIZATION</a></li>
+	</ul>
+
+	<li><a href="#future_directions">FUTURE DIRECTIONS</a></li>
+	<li><a href="#bugs">BUGS</a></li>
+	<li><a href="#history">HISTORY</a></li>
+	<li><a href="#author">AUTHOR</a></li>
+</ul>
+<!-- INDEX END -->
+
+<hr />
+<p>
+</p>
+<hr />
+<h1><a name="name">NAME</a></h1>
+<p>pandrome -- Generate palindromic pangrams</p>
+<p>
+</p>
+<hr />
+<h1><a name="usage">USAGE</a></h1>
+<pre>
+        pandrome [--optimize size|speed] [--verbose] wordfiles
+        pandrome --version</pre>
+<p>
+</p>
+<hr />
+<h1><a name="description">DESCRIPTION</a></h1>
+<p>pandrome generates ``palindromic pangrams'', palindromes which use all 26 letters
+of the English alphabet.</p>
+<p>The input is a list of the words which may be used to construct the output.
+Any arguments remaining on the command line after option processing will
+be interpreted as paths to files containing words, one word per line.
+Comments and blank lines are not allowed.  If multiple files are specified,
+words will be taken from all of them.  If no word files are specified, data
+will be taken from standard input.</p>
+<p>The palindromic pangram is written to standard output.</p>
+<p>The first time the program is executed with a given word list, it will be
+several minutes slower than successive executions.  It is spending this time
+converting the flat word list into the data structures it uses; these
+structures are then written to a cache in <code>~/.pandrome</code>.</p>
+<p>Options:</p>
+<dl>
+<dt><strong><a name="item_optimize">--optimize (-o) <em>size|speed</em></a></strong><br />
+</dt>
+<dd>
+If set to <code>size</code>, the program will take extra time to find shorter pangrams,
+both in terms of number of letters and number of words (although we are biased
+in favor of fewer letters over fewer words.)
+The default is <code>speed</code>.  Note that parameter only tunes the program slightly;
+<code>speed</code> will still find fairly good results, and <code>size</code> will still run
+rather quickly.
+</dd>
+<p></p>
+<dt><strong><a name="item_verbose">--verbose (-v)</a></strong><br />
+</dt>
+<dd>
+This option causes progress information to be written to standard error.
+It can be specified multiple times to increase the amount of information
+displayed; values greater than 1 are probably only useful for debugging
+the program.
+</dd>
+<p></p>
+<dt><strong><a name="item_version">--version (-V)</a></strong><br />
+</dt>
+<dd>
+If this option is specified, the program's version will be written to standard
+output and the program will exit immediately.
+</dd>
+<p></p></dl>
+<p>
+</p>
+<hr />
+<h1><a name="files">FILES</a></h1>
+<p>~/.pandrome</p>
+<p>
+</p>
+<hr />
+<h1><a name="algorithm">ALGORITHM</a></h1>
+<p>The program focuses on obtaining good results extremely quickly; it never backtracks
+unless absolutely necessary, and it doesn't do anything too time-consuming
+when ordering the list of successor states.  Better results can be obtained via
+a more AI-esque approach.</p>
+<p>
+</p>
+<h2><a name="data_structures">DATA STRUCTURES</a></h2>
+<p>pandrome makes heavy use of tries.  A trie is a tree which stores the label
+for a vertex in the path to reach that vertex; so, ``foo'' would be a node
+at depth 3, f-&gt;o-&gt;o.  We use two tries, one containing all of the
+words in the word list (the prefix trie) and one containing all of the 
+words backwards (the suffix trie).  This lets us quickly get a list of all
+words which start or end with a given string.  Our tries are implemented
+as a custom subclass of the CPAN module <code>Tree::Trie</code>; see
+the comments at the top of <code>PandromeTrie.pm</code> for more details.</p>
+<p>We keep track of the solution as a list of ``head'' words that will go at the
+beginning and a list of ``tail'' words that will go at the end.  As we build
+the palindrome, we insert a word at one end, and then we insert a sequence
+of words at the other end which begin with the backwards version of that word.
+If we started by inserting <code>panama</code> at the end, the next move would be to
+insert a word at the beginning.  Ideally, we'd like something which starts
+with the string <code>amanap</code>, but if no such word exists (how unlikely!),
+we'll try <code>amana</code>, <code>aman</code>, <code>ama</code>, <code>am</code>, <code>a</code>, and if none of those
+work we'll give up and decide that <code>panama</code> wasn't a good word to insert
+at the end after all.</p>
+<p>
+</p>
+<h2><a name="word_selection">WORD SELECTION</a></h2>
+<p>How well the program performs is determined by how cleverly it can pick
+the next word to insert.  When preparing to insert a word into the solution, we
+generate the list of all possible successor words, and sort it by, in
+descending order of importance:</p>
+<ol>
+<li></li>
+Is the word long enough to match the text that it needs to match?
+If the head of the solution is <code>foos</code> and the tail is <code>of</code>,
+we still need to insert another word at the beginning of the tail
+which ends with <code>so</code> in order to have the anagram be balanced.
+So, in this case, we would prefer that our matches be at least two
+letters long.
+<p></p>
+<li></li>
+How good does it look like the word will be?  The heuristic function we use
+here takes into account:
+<ul>
+<li></li>
+Whether the word is reversible; that is, after balancing the current solution,
+can the leftover letters be flipped to form another valid word?  This lets
+use prefer <code>birds</code> to <code>wounds</code> when balancing out a head that starts with
+<code>sd</code>; the <code>ds</code> goes to balance the solution, and then the head needs to
+start with <code>rib</code>.  Because <code>rib</code> is a valid word, we can simply use that,
+and then we have a completely balanced anagram and can pick whatever we want
+for our next word, letting us get rid of some tricky letters.
+<p></p>
+<li></li>
+How many letters that aren't in the solution will the word provide?
+Rarer letters are weighted more favorably.
+<p></p>
+<li></li>
+How many rare letters that we <em>have</em> already seen does the word have?  Rare
+letters make it harder to balance the anagram, since it's trickier to find
+words which contain them and meet all the other criteria.
+<p></p>
+<li></li>
+How long is the word?  This criterion is only used when optimizing for size.
+<p></p></ul>
+<p>The different factors may have different weights, depending on optimization
+settings.  These values were determined empirically.</p>
+<li></li>
+As a tie-breaker, the words are lexically sorted.
+<p></p></ol>
+<p>
+</p>
+<h2><a name="q_optimization">Q OPTIMIZATION</a></h2>
+<p><code>q</code> is the most troublesome letter.  Not only is it extremely rare -- there
+are only 2541 words which contain it in the 173,528-word sample word list --
+but there are only 30 words in the sample list which contain it without
+it being followed immediately by a <code>u</code>.  This makes it reasonably easy to get
+<code>q</code> in one direction, by using a <code>qu</code>-word, but then it's extremely
+difficult to balance it in the other direction.  We do some tricks to get this
+over with as quickly as possible.</p>
+<p>We start the anagram by picking a word containing a <code>q</code>.  When optimizing
+for speed, we just pick a word containing <code>uq</code>.  This ensures that balancing
+it requires the comparatively simple task of finding a suitable <code>qu</code>-word.
+When optimizing for size, we try starting with words that contain a <code>q</code>
+but <em>not</em> a <code>u</code>, sorted in order of how probable their letters are; this
+maximizes our flexibility while getting rid of the pesky <code>q</code>, but if that
+doesn't work, we fall back on starting with words that start or end with
+<code>q</code> or words which contain <code>uq</code>.</p>
+<p>
+</p>
+<hr />
+<h1><a name="future_directions">FUTURE DIRECTIONS</a></h1>
+<p><a href="http://www.32768.com/bill/weblog/2003/07/11/some-programming-problems-at-ita-software/">http://www.32768.com/bill/weblog/2003/07/11/some-programming-problems-at-ita-software/</a>
+has a number of solutions which are shorter than the ones typically generated
+by this program (I didn't use any of the data from this page in developing the
+program, but I was curious as to how optimal my output was, so I Googled a bit.
+--MS)  One specific thing that some of their best answers have is a 'q' in the
+middle of their odd-length palindrome.  I don't attempt to take advantage of
+the special characteristic of the center, and adding the ability to build
+out from the center would require non-trivial changes to the program.</p>
+<p>I spent some time tuning a few of the parameters and playing with some
+different ways to use the data I already have available, but I didn't do
+this extensively.  A genetic algorithm, or simply more time, might find
+a better set of weights for the successor-scoring function, for instance.
+I did experiment briefly with utilizing bigram probabilities in addition to
+unigram probabilities, but that produced worse output and took longer to do it.</p>
+<p>
+</p>
+<hr />
+<h1><a name="bugs">BUGS</a></h1>
+<p>Of course not, who would submit code that had any bugs for a job application?</p>
+<p>
+</p>
+<hr />
+<h1><a name="history">HISTORY</a></h1>
+<p>Written 2006-11-13 for ITA Software's job application.</p>
+<p>
+</p>
+<hr />
+<h1><a name="author">AUTHOR</a></h1>
+<p>Matthew Sachs &lt;<a href="mailto:matthewg@zevils.com">matthewg@zevils.com</a>&gt;
+<a href="http://www.zevils.com/misc/resume.html">http://www.zevils.com/misc/resume.html</a></p>
+
+</body>
+
+</html>
